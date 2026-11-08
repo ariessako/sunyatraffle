@@ -13,15 +13,14 @@
 <body>
   <form id="pin-gate" class="gate" hidden>
     <img class="gate-logo" src="logo.jpg" alt="Sun Yat Sen High School of Iloilo, 101 years">
-    <h1>Ticket Scanner</h1>
+    <h1>Sign in</h1>
     <p class="gate-event">101st Alumni Homecoming</p>
     <label for="user-input">Username</label>
-    <input id="user-input" type="text" autocapitalize="none" autocorrect="off" autocomplete="username" spellcheck="false">
+    <input id="user-input" type="text" autocapitalize="none" autocorrect="off" autocomplete="username" spellcheck="false" required>
     <label for="pin-input">PIN</label>
     <input id="pin-input" type="password" inputmode="numeric" autocomplete="current-password" required>
-    <p class="gate-hint">No username? Leave it blank and use the shared staff PIN.</p>
     <p id="pin-error" class="error" role="alert"></p>
-    <button class="primary" type="submit">Start scanning</button>
+    <button class="primary" type="submit">Sign in</button>
   </form>
 
   <form id="edit-form" class="gate" novalidate hidden>
@@ -114,10 +113,6 @@
     <section id="tab-setup" class="tab page" hidden>
       <h2>This scanner</h2>
       <p id="signed-in" class="note"></p>
-      <div id="device-field">
-        <label for="device-name">Device name shown on records</label>
-        <input id="device-name" type="text" maxlength="60" autocomplete="off">
-      </div>
       <button id="sign-out" type="button">Sign out</button>
       <p id="sign-out-result" class="note" role="status"></p>
 

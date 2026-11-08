@@ -62,25 +62,6 @@ button:disabled { opacity: .5; cursor: default; }
 .error { margin: 6px 0; color: var(--bad); font-weight: 600; }
 .error.banner { padding: 10px 12px; background: #fdecec; border-radius: 8px; }
 
-.login {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 24px max(16px, calc(50% - 170px));
-  background: #fff;
-  text-align: center;
-  overflow-y: auto;
-}
-.login img { width: auto; max-width: min(70%, 260px); max-height: 26vh; margin: 0 auto 4px; }
-/* Centred when there's room, scrollable from the top when there isn't. */
-.login > :first-child { margin-top: auto; }
-.login > :last-child { margin-bottom: auto; }
-.login h1 { margin: 0; font-size: 28px; }
-.login .event { margin: 0 0 8px; color: var(--gold-ink); font-weight: 600; }
-.login label { display: grid; gap: 4px; color: var(--ink-2); font-size: 13px; text-align: left; }
 
 .top {
   position: sticky;
@@ -163,9 +144,6 @@ td.action { text-align: right; }
 }
 
 .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .08em; }
-.card.shared { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-.card.shared > div { flex: 1 1 320px; }
-.card.shared .note { margin-bottom: 0; }
 .pin-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; background: #fdf3d6; border-color: #e9cf83; }
 .pin-notice p { flex: 1 1 300px; margin: 0; font-weight: 600; }
 .pin-notice b { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1.15em; letter-spacing: .08em; }

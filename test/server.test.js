@@ -14,14 +14,19 @@ let fakeApi;
 const apiRequests = [];
 let fakeReply;
 
-async function call(url, body, pin = '1234') {
+// Requests as a signed-in scanner account (made in test.before), whose name is "A".
+let staffToken = '';
+async function call(url, body, token = staffToken) {
   return fetch(BASE + url, {
     method: body ? 'POST' : 'GET',
-    headers: { 'x-pin': pin, 'Content-Type': 'application/json' },
+    headers: { 'x-staff-token': token, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
 }
 const sync = async (body) => (await call('/api/sync', body)).json();
+const login = (username, pin) => fetch(BASE + '/api/login', { method: 'POST', body: JSON.stringify({ username, pin }) });
+// The admin PIN is the built-in 111226, since these tests don't set ADMIN_PIN.
+const adminLogin = async () => (await (await login('admin', '111226')).json()).token;
 
 let adminToken = '';
 async function admin(url, body) {
@@ -47,15 +52,20 @@ test.before(async () => {
 
   server = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
     env: {
-      ...process.env, USE_HTTP: '1', PORT: String(PORT), DATA_DIR: dir, EVENT_PIN: '1234', ADMIN_PASSWORD: 'admin-pass',
+      ...process.env, USE_HTTP: '1', PORT: String(PORT), DATA_DIR: dir, ADMIN_PIN: '',
       ANTHROPIC_API_KEY: 'test-key', ANTHROPIC_BASE_URL: `http://127.0.0.1:${fakeApi.address().port}`,
     },
     stdio: 'ignore',
   });
-  for (let i = 0; i < 50; i++) {
-    try { await fetch(BASE + '/'); return; } catch { await new Promise((r) => setTimeout(r, 100)); }
+  let up = false;
+  for (let i = 0; i < 50 && !up; i++) {
+    try { await fetch(BASE + '/'); up = true; } catch { await new Promise((r) => setTimeout(r, 100)); }
   }
-  throw new Error('server did not start');
+  if (!up) throw new Error('server did not start');
+
+  adminToken = await adminLogin();
+  await admin('/api/admin/scanners', { name: 'A', username: 'gate-a', pin: '4321' });
+  staffToken = (await (await login('gate-a', '4321')).json()).token;
 });
 
 test.after(() => {
@@ -92,12 +102,30 @@ test('reads handwriting from a photo and fails cleanly', async () => {
 
   const before = apiRequests.length;
   assert.strictEqual((await call('/api/read-ticket', { image: 'not a jpeg' })).status, 400);
-  assert.strictEqual((await call('/api/read-ticket', { image }, 'nope')).status, 401);
+  assert.strictEqual((await call('/api/read-ticket', { image }, 'not-a-token')).status, 401);
   assert.strictEqual(apiRequests.length, before);
 });
 
-test('API needs the PIN and static files cannot escape public/', async () => {
-  assert.strictEqual((await call('/api/sync', {}, 'nope')).status, 401);
+test('one sign-in: admin PIN opens admin, scanner accounts open the scanner', async () => {
+  const adminRes = await (await login('Admin ', '111226')).json();
+  assert.strictEqual(adminRes.role, 'admin');
+  assert.strictEqual((await login('admin', '111227')).status, 401);
+  const scannerRes = await (await login('gate-a', '4321')).json();
+  assert.strictEqual(scannerRes.role, 'scanner');
+  assert.strictEqual(scannerRes.name, 'A');
+  assert.strictEqual((await login('gate-a', '0000')).status, 401);
+  // Each kind of sign-in only opens its own side.
+  assert.strictEqual((await call('/api/admin/state', undefined, scannerRes.token)).status, 401);
+  assert.strictEqual((await call('/api/sync', {}, adminRes.token)).status, 401);
+  // The old shared staff PIN is gone.
+  const pinOnly = await fetch(BASE + '/api/sync', { method: 'POST', headers: { 'x-pin': '1234' }, body: '{}' });
+  assert.strictEqual(pinOnly.status, 401);
+  // No scanner can take the admin's username.
+  assert.strictEqual((await admin('/api/admin/scanners', { name: 'Fake Admin', username: 'admin' })).status, 409);
+});
+
+test('API needs a sign-in and static files cannot escape public/', async () => {
+  assert.strictEqual((await call('/api/sync', {}, 'not-a-token')).status, 401);
   assert.strictEqual((await fetch(BASE + '/%2e%2e/server.js')).status, 404);
   assert.strictEqual((await fetch(BASE + '/index.html')).status, 200);
 });
@@ -149,15 +177,9 @@ test('re-import keeps check-ins, and clearing rejects stale queued scans', async
   assert.deepStrictEqual(after.rows, []);
 });
 
-test('admin login, participants, prizes and a fair draw', async () => {
-  assert.strictEqual((await admin('/api/admin/state')).status, 401);
-  const wrong = await fetch(BASE + '/api/admin/login', { method: 'POST', body: JSON.stringify({ username: 'admin', password: 'nope' }) });
-  assert.strictEqual(wrong.status, 401);
-  const login = await fetch(BASE + '/api/admin/login', { method: 'POST', body: JSON.stringify({ username: 'admin', password: 'admin-pass' }) });
-  adminToken = (await login.json()).token;
+test('admin participants, prizes and a fair draw', async () => {
+  adminToken = await adminLogin();
   assert.ok(adminToken);
-  // The staff PIN must not open admin pages, and the admin token must not replace the PIN.
-  assert.strictEqual((await call('/api/admin/state')).status, 401);
 
   const { epoch } = await sync({});
   await sync({ epoch, ops: ['21', '22', '23', '24'].map((n, i) => ({ type: 'checkin', number: n, name: `Guest ${n}`, batch: '2013', at: 9000 + i, device: 'A' })) });
@@ -216,12 +238,10 @@ test('admin login, participants, prizes and a fair draw', async () => {
 
   await admin('/api/admin/logout', {});
   assert.strictEqual((await admin('/api/admin/state')).status, 401);
+  adminToken = await adminLogin();
 });
 
-test('scanner accounts: sign in, name on records, disable, reset, shared PIN switch', async () => {
-  const login = await fetch(BASE + '/api/admin/login', { method: 'POST', body: JSON.stringify({ username: 'admin', password: 'admin-pass' }) });
-  adminToken = (await login.json()).token;
-
+test('scanner accounts: sign in, name on records, disable, reset', async () => {
   const created = await (await admin('/api/admin/scanners', { name: 'Gate Maria', username: 'Maria', pin: '' })).json();
   assert.strictEqual(created.username, 'maria');
   assert.match(created.pin, /^\d{6}$/);
@@ -229,7 +249,7 @@ test('scanner accounts: sign in, name on records, disable, reset, shared PIN swi
   assert.strictEqual((await admin('/api/admin/scanners', { name: 'Someone', username: 'maria' })).status, 409);
   assert.strictEqual((await admin('/api/admin/scanners', { name: 'Bad Pin', username: 'bad', pin: '12' })).status, 400);
 
-  const staffLogin = (username, pin) => fetch(BASE + '/api/login', { method: 'POST', body: JSON.stringify({ username, pin }) });
+  const staffLogin = login;
   assert.strictEqual((await staffLogin('maria', '000000' === created.pin ? '111111' : '000000')).status, 401);
   const session = await (await staffLogin('MARIA ', created.pin)).json();
   assert.strictEqual(session.name, 'Gate Maria');
@@ -247,7 +267,6 @@ test('scanner accounts: sign in, name on records, disable, reset, shared PIN swi
   const maria = state.scanners.find((s) => s.username === 'maria');
   assert.strictEqual(maria.devices, 1);
   assert.strictEqual(maria.scans, 1);
-  assert.strictEqual(state.sharedPin.pin, '1234');
   assert.ok(!('pin_hash' in maria));
 
   // Turning an account off signs it out at once, and it can't sign back in.
@@ -264,24 +283,13 @@ test('scanner accounts: sign in, name on records, disable, reset, shared PIN swi
   const again = await (await staffLogin('maria', '24680')).json();
   assert.ok(again.token);
 
-  // The shared PIN can be switched off; personal logins keep working.
-  await admin('/api/admin/shared-pin', { enabled: false });
-  const shared = await call('/api/sync', {});
-  assert.strictEqual(shared.status, 401);
-  assert.match((await shared.json()).error, /turned off/);
-  const own = await fetch(BASE + '/api/sync', { method: 'POST', headers: { 'x-staff-token': again.token }, body: '{}' });
-  assert.strictEqual(own.status, 200);
-  await admin('/api/admin/shared-pin', { enabled: true });
-  assert.strictEqual((await call('/api/sync', {})).status, 200);
-
   await admin('/api/admin/scanners/delete', { id: maria.id });
   const gone = await fetch(BASE + '/api/sync', { method: 'POST', headers: { 'x-staff-token': again.token }, body: '{}' });
   assert.strictEqual(gone.status, 401);
 });
 
 test('admin screens are told about changes the moment they happen', async () => {
-  const login = await fetch(BASE + '/api/admin/login', { method: 'POST', body: JSON.stringify({ username: 'admin', password: 'admin-pass' }) });
-  const token = (await login.json()).token;
+  const token = await adminLogin();
   assert.strictEqual((await fetch(BASE + '/api/admin/events?token=wrong')).status, 401);
 
   const controller = new AbortController();

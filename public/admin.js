@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const BACKUP_REFRESH_MS = 10000; // Changes are pushed instantly; this only covers a dropped connection.
 const ROW_LIMIT = 300;
 
-let data = { version: '', guests: [], prizes: [], poolSize: 0, scanners: [], sharedPin: { pin: '', enabled: true } };
+let data = { version: '', guests: [], prizes: [], poolSize: 0, scanners: [] };
 let filter = 'admitted';
 
 const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -246,9 +246,6 @@ function editPrize(li, prize) {
 // ---- Scanners ----
 
 function renderScanners() {
-  const shared = data.sharedPin;
-  $('shared-pin').textContent = shared.enabled ? shared.pin : `${shared.pin} (off)`;
-  $('shared-toggle').textContent = shared.enabled ? 'Turn off shared PIN' : 'Turn on shared PIN';
   $('scanners').replaceChildren(...data.scanners.map(scannerRow));
   $('scanners-note').textContent = data.scanners.length ? ''
     : 'No scanner accounts yet. Add one for each person scanning tickets.';
@@ -311,8 +308,6 @@ $('add-scanner').addEventListener('submit', async (e) => {
   }
 });
 $('pin-notice-close').addEventListener('click', () => { $('pin-notice').hidden = true; });
-$('shared-toggle').addEventListener('click', () => act(
-  () => AdminSession.call('/api/admin/shared-pin', { enabled: !data.sharedPin.enabled }), $('scanner-result')));
 
 function showView() {
   const view = ['#prizes', '#scanners'].includes(location.hash) ? location.hash.slice(1) : 'participants';

@@ -24,9 +24,16 @@ Needs Node 22.13 or newer. There is nothing to install.
 npm start
 ```
 
-The terminal prints the staff PIN and the address for phones. Connect phones to the same Wi-Fi as this computer, open the address, accept the certificate warning once, and enter the PIN.
+The terminal prints the address for phones. Connect phones to the same Wi-Fi as this computer, open the address, and accept the certificate warning once.
 
-Set your own PIN with `EVENT_PIN=1234 npm start`.
+## Signing in
+
+Everyone uses the one sign-in page with a username and PIN.
+
+- **Admin:** username `admin`, PIN `111226`. This opens the admin page. Change the PIN with `ADMIN_PIN=... npm start`, and do so before putting the app on the internet.
+- **Scanners:** the admin makes an account for each person on the admin page's Scanners tab. Signing in with it opens the scanner.
+
+The admin page and raffle screen send anyone not signed in to this page, then back once the admin PIN is entered.
 
 ## Before the event
 
@@ -50,17 +57,14 @@ The guest list is optional. Once one is loaded, tickets not on it are refused. W
 
 ## Admin and raffle
 
-The admin account is created automatically. The terminal prints its login when the server starts (`Admin login: admin / ...`), and the password is kept in `data/admin-password.txt`. Set your own with `ADMIN_PASSWORD=... npm start`. It is separate from the staff PIN.
-
 **Admin page** (`/admin.html`)
 - Participants: everyone scanned, with search and filters. Remove someone from the draw (staff, ineligible guests) or add them back, admit someone who wasn't scanned, and export participants or winners as CSV.
 - Prizes: add prizes with how many winners each gets, edit them, and set the drawing order. The list shows each prize's winners. **Not present** cancels a win and takes that person out of the draw.
 
 **Scanners** (admin page, Scanners tab)
 - Add an account for each person scanning: the name to show on records, a username, and a PIN (leave it blank for a random 6-digit one). The PIN is shown once, so pass it on straight away.
-- They sign in on the scanner with that username and PIN, and every check-in they make is recorded under their name.
+- They sign in with that username and PIN, and every check-in they make is recorded under their name.
 - **New PIN**, **Turn off** and **Delete** sign that person out of every device at once. The table shows how many devices each person is signed in on and how many tickets they've scanned.
-- The shared staff PIN still works, with a username left blank, until you press **Turn off shared PIN**. Turn it off once everyone has their own login.
 
 **Raffle screen** (`/raffle.html`) is for the projector. Open it on the laptop connected to the projector and log in with the admin account.
 - Choose the prize, then press **Draw** or the space bar. The reels stop one by one on the winning ticket number, then the name and batch appear.
@@ -83,7 +87,7 @@ If Wi-Fi drops, scanners keep working from their own copy and send their scans w
 
 ## Hosting instead of a laptop
 
-Run with `USE_HTTP=1` behind any HTTPS host or tunnel, and set `DATA_DIR` to persistent storage. Always set a strong `EVENT_PIN` when it is reachable from the internet, because this data includes people's emails.
+Run with `USE_HTTP=1` behind any HTTPS host or tunnel, and set `DATA_DIR` to persistent storage. Always set your own `ADMIN_PIN` when it is reachable from the internet, because this data includes people's emails.
 
 ## Tests
 

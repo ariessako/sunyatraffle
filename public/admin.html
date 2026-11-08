@@ -9,16 +9,6 @@
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
-  <form id="login" class="login" hidden>
-    <img src="logo.jpg" alt="Sun Yat Sen High School of Iloilo, 101 years">
-    <h1>Admin</h1>
-    <p class="event">101st Alumni Homecoming</p>
-    <label>Username <input name="username" value="admin" autocomplete="username" autocapitalize="none" required></label>
-    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-    <p class="error" role="alert"></p>
-    <button class="primary" type="submit">Log in</button>
-  </form>
-
   <header class="top">
     <img class="brand" src="logo-mark.jpg" alt="Sun Yat Sen High School of Iloilo">
     <div class="title">
@@ -97,14 +87,6 @@
       <ol id="prizes" class="prizes"></ol>
     </section>
     <section id="view-scanners" class="view" hidden>
-      <div class="card shared">
-        <div>
-          <strong>Shared staff PIN: <span id="shared-pin" class="mono"></span></strong>
-          <p class="note">Anyone with this PIN can scan, and their records show the device name instead of a person. Turn it off once every scanner has their own login.</p>
-        </div>
-        <button id="shared-toggle" type="button"></button>
-      </div>
-
       <form id="add-scanner" class="card row-form" novalidate>
         <label>Name on records <input name="name" maxlength="60" placeholder="e.g. Maria (Gate 1)" autocomplete="off" required></label>
         <label>Username <input name="username" maxlength="30" placeholder="e.g. maria" autocapitalize="none" autocomplete="off" required></label>

@@ -19,28 +19,12 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
 
-// An environment variable wins; otherwise the secret is generated once and kept in the data folder.
-function loadSecret(envName, fileName, generate) {
-  if (process.env[envName]) return process.env[envName];
-  const file = path.join(DATA_DIR, fileName);
-  if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8').trim();
-  const secret = generate();
-  fs.writeFileSync(file, secret + '\n', { mode: 0o600 });
-  return secret;
-}
-
-function generatePassword() {
-  const letters = 'abcdefghjkmnpqrstuvwxyz23456789'; // No look-alikes such as l, 1, o and 0.
-  const pick = () => Array.from({ length: 4 }, () => letters[crypto.randomInt(letters.length)]).join('');
-  return `${pick()}-${pick()}-${pick()}`;
-}
-
 const sha256 = (value) => crypto.createHash('sha256').update(String(value ?? '')).digest();
-const PIN = loadSecret('EVENT_PIN', 'pin.txt', () => String(crypto.randomInt(100000, 1000000)));
+// Everyone signs in on one page with a username and PIN. This one opens the admin page;
+// scanner accounts are made on the admin page. Set ADMIN_PIN to change it.
 const ADMIN_USER = 'admin';
-const ADMIN_PASSWORD = loadSecret('ADMIN_PASSWORD', 'admin-password.txt', generatePassword);
-const PIN_HASH = sha256(PIN);
-const ADMIN_HASH = sha256(ADMIN_PASSWORD);
+const ADMIN_PIN = process.env.ADMIN_PIN || '111226';
+const ADMIN_HASH = sha256(ADMIN_PIN);
 
 const db = new DatabaseSync(path.join(DATA_DIR, 'checkins.db'));
 db.exec(`
@@ -66,7 +50,6 @@ const setMeta = db.prepare('INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT(k)
 if (!getMeta.get('epoch')) setMeta.run('epoch', crypto.randomUUID());
 if (!getMeta.get('seq')) setMeta.run('seq', '0');
 if (!getMeta.get('raffle_version')) setMeta.run('raffle_version', '0');
-if (!getMeta.get('shared_pin_enabled')) setMeta.run('shared_pin_enabled', '1');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS scanners (
@@ -278,11 +261,9 @@ class HttpError extends Error {
   }
 }
 
-// ---- Scanner accounts ----
-// Each staff member signs in with a username and PIN made on the admin page.
-// The shared staff PIN keeps working until the admin turns it off.
+// ---- Sign-in ----
+// One sign-in for everyone: admin, or a scanner account made on the admin page.
 
-const sharedPinEnabled = () => getMeta.get('shared_pin_enabled').v === '1';
 const sha256hex = (value) => sha256(value).toString('hex');
 
 function hashPin(pin) {
@@ -304,34 +285,29 @@ const insertSession = db.prepare('INSERT INTO scanner_sessions (token_hash, scan
 const deleteSession = db.prepare('DELETE FROM scanner_sessions WHERE token_hash = ?');
 const deleteSessionsOf = db.prepare('DELETE FROM scanner_sessions WHERE scanner_id = ?');
 
-// Returns { scanner } (null for the shared PIN) when allowed; otherwise answers 401 and returns null.
+// Returns the signed-in scanner, or answers 401 and returns null.
 function staffAllowed(req, res) {
-  const token = req.headers['x-staff-token'];
-  if (token) {
-    const scanner = sessionScanner.get(sha256hex(token));
-    if (scanner) return { scanner };
-    json(res, 401, { error: 'You were signed out. Sign in again.' });
-    return null;
-  }
-  if (lockedOut(req, res)) return null;
-  const ok = crypto.timingSafeEqual(sha256(req.headers['x-pin']), PIN_HASH);
-  noteAttempt(req, ok);
-  if (!ok) {
-    json(res, 401, { error: 'Wrong PIN' });
-    return null;
-  }
-  if (!sharedPinEnabled()) {
-    json(res, 401, { error: 'The shared PIN is turned off. Sign in with your own username and PIN.' });
-    return null;
-  }
-  return { scanner: null };
+  const scanner = sessionScanner.get(sha256hex(String(req.headers['x-staff-token'] ?? '')));
+  if (scanner) return scanner;
+  json(res, 401, { error: 'Please sign in.' });
+  return null;
 }
 
 const cleanUsername = (value) => String(value ?? '').trim().toLowerCase();
 
-function staffLogin(body, req, res) {
+// The answer's role tells the page where to go: the admin page or the scanner.
+function login(body, req, res) {
   if (lockedOut(req, res)) return;
-  const scanner = getScannerByUsername.get(cleanUsername(body.username));
+  const username = cleanUsername(body.username);
+  if (username === ADMIN_USER) {
+    const ok = crypto.timingSafeEqual(sha256(String(body.pin ?? '').trim()), ADMIN_HASH);
+    noteAttempt(req, ok);
+    if (!ok) return json(res, 401, { error: 'Wrong username or PIN' });
+    const token = crypto.randomBytes(32).toString('base64url');
+    insertAdminSession.run(sha256hex(token), Date.now() + SESSION_DAYS * 86400000);
+    return json(res, 200, { role: 'admin', token });
+  }
+  const scanner = getScannerByUsername.get(username);
   // Hash even for an unknown name, so timing doesn't reveal which usernames exist.
   const ok = pinMatches(body.pin ?? '', scanner?.pin_hash ?? DUMMY_PIN_HASH) && Boolean(scanner?.active);
   noteAttempt(req, ok);
@@ -342,7 +318,7 @@ function staffLogin(body, req, res) {
   const token = crypto.randomBytes(32).toString('base64url');
   insertSession.run(sha256hex(token), scanner.id, Date.now());
   bumpRaffle();
-  json(res, 200, { token, name: scanner.name });
+  json(res, 200, { role: 'scanner', token, name: scanner.name });
 }
 
 function staffLogout(req, res) {
@@ -362,6 +338,7 @@ function addScanner(body) {
   const username = cleanUsername(body.username);
   if (!name) throw new HttpError(400, 'Enter the name to show on records.');
   if (!/^[a-z0-9._-]{2,30}$/.test(username)) throw new HttpError(400, 'Usernames are 2 to 30 letters or numbers, with no spaces.');
+  if (username === ADMIN_USER) throw new HttpError(409, 'The username admin is kept for the admin.');
   const pin = newPin(body.pin);
   try {
     db.prepare('INSERT INTO scanners (username, name, pin_hash, created_at) VALUES (?, ?, ?, ?)')
@@ -405,12 +382,6 @@ function deleteScanner(body) {
   return { ok: true };
 }
 
-function setSharedPin(body) {
-  setMeta.run('shared_pin_enabled', body.enabled ? '1' : '0');
-  bumpRaffle();
-  return { ok: true };
-}
-
 const listScanners = db.prepare(`SELECT s.id, s.username, s.name, s.active, s.created_at,
     (SELECT COUNT(*) FROM scanner_sessions t WHERE t.scanner_id = s.id) AS devices,
     (SELECT COUNT(*) FROM guests g WHERE g.checked_in_by = s.name AND g.checked_in_at IS NOT NULL) AS scans
@@ -424,17 +395,6 @@ const insertAdminSession = db.prepare('INSERT INTO admin_sessions (token_hash, e
 const getAdminSession = db.prepare('SELECT expires_at FROM admin_sessions WHERE token_hash = ?');
 const deleteAdminSession = db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?');
 db.prepare('DELETE FROM admin_sessions WHERE expires_at < ?').run(Date.now());
-
-function adminLogin(body, req, res) {
-  if (lockedOut(req, res)) return;
-  const ok = crypto.timingSafeEqual(sha256(body.username), sha256(ADMIN_USER))
-    & crypto.timingSafeEqual(sha256(body.password), ADMIN_HASH);
-  noteAttempt(req, ok);
-  if (!ok) return json(res, 401, { error: 'Wrong username or password' });
-  const token = crypto.randomBytes(32).toString('base64url');
-  insertAdminSession.run(sha256hex(token), Date.now() + SESSION_DAYS * 86400000);
-  json(res, 200, { token });
-}
 
 function adminTokenValid(token) {
   const session = getAdminSession.get(sha256hex(String(token ?? '')));
@@ -516,7 +476,7 @@ function adminState(since) {
   if (since === version) return { unchanged: true, version };
   return {
     version, guests: allGuests.all(), prizes: prizesWithWinners({ withEmail: true }), poolSize: rafflePool.all().length,
-    scanners: listScanners.all(), sharedPin: { pin: PIN, enabled: sharedPinEnabled() },
+    scanners: listScanners.all(),
   };
 }
 
@@ -643,12 +603,10 @@ const ADMIN_POSTS = {
   '/api/admin/scanners/active': setScannerActive,
   '/api/admin/scanners/reset-pin': resetScannerPin,
   '/api/admin/scanners/delete': deleteScanner,
-  '/api/admin/shared-pin': setSharedPin,
 };
 
 async function handleAdmin(req, res, url) {
   const { pathname } = url;
-  if (req.method === 'POST' && pathname === '/api/admin/login') return adminLogin(await readJson(req), req, res);
   if (req.method === 'GET' && pathname === '/api/admin/events') return openEvents(url, res);
   if (!adminAllowed(req, res)) return;
   const since = url.searchParams.get('since') || '';
@@ -708,11 +666,11 @@ async function handle(req, res) {
   }
   try {
     if (pathname.startsWith('/api/admin/')) return await handleAdmin(req, res, url);
-    if (req.method === 'POST' && pathname === '/api/login') return staffLogin(await readJson(req), req, res);
+    if (req.method === 'POST' && pathname === '/api/login') return login(await readJson(req), req, res);
     if (req.method === 'POST' && pathname === '/api/logout') return staffLogout(req, res);
-    const allowed = staffAllowed(req, res);
-    if (!allowed) return;
-    if (req.method === 'POST' && pathname === '/api/sync') return json(res, 200, sync(await readJson(req), allowed.scanner));
+    const scanner = staffAllowed(req, res);
+    if (!scanner) return;
+    if (req.method === 'POST' && pathname === '/api/sync') return json(res, 200, sync(await readJson(req), scanner));
     if (req.method === 'POST' && pathname === '/api/read-ticket') return await readTicketPhoto(await readJson(req), res);
     if (req.method === 'POST' && pathname === '/api/import') return json(res, 200, importGuests(await readJson(req)));
     if (req.method === 'POST' && pathname === '/api/clear') return json(res, 200, clearAll());
@@ -746,8 +704,8 @@ function lanAddresses() {
 const server = USE_HTTP ? http.createServer(handle) : https.createServer(tlsOptions(), handle);
 server.listen(PORT, () => {
   const scheme = USE_HTTP ? 'http' : 'https';
-  console.log(`\nTicket scanner is running. Staff PIN: ${process.env.EVENT_PIN ? '(set by EVENT_PIN)' : PIN}`);
-  console.log(`Admin login: ${ADMIN_USER} / ${process.env.ADMIN_PASSWORD ? '(set by ADMIN_PASSWORD)' : ADMIN_PASSWORD}\n`);
+  console.log(`\nTicket scanner is running.`);
+  console.log(`Admin sign-in: username ${ADMIN_USER}, PIN ${process.env.ADMIN_PIN ? '(set by ADMIN_PIN)' : ADMIN_PIN}. Scanners sign in with accounts made on the admin page.\n`);
   console.log(`  This computer: ${scheme}://localhost:${PORT}`);
   for (const ip of lanAddresses()) console.log(`  Phones on the same Wi-Fi: ${scheme}://${ip}:${PORT}`);
   console.log(`  Admin page: ${scheme}://localhost:${PORT}/admin.html`);

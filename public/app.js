@@ -14,10 +14,8 @@ const state = {
   queue: [],
   since: 0,
   epoch: null,
-  pin: '', // The shared staff PIN, when signed in with that.
-  token: '', // A personal scanner login from the admin page.
-  user: '', // That login's name, which the server puts on check-ins.
-  device: 'Scanner ' + Math.random().toString(36).slice(2, 5).toUpperCase(),
+  token: '', // This scanner's sign-in, from an account made on the admin page.
+  user: '', // That account's name, which the server puts on check-ins.
   reader: false, // Whether the server can read handwriting from a photo.
 };
 
@@ -29,10 +27,8 @@ function loadStore() {
     state.queue = saved.queue || [];
     state.since = saved.since || 0;
     state.epoch = saved.epoch || null;
-    state.pin = saved.pin || '';
     state.token = saved.token || '';
     state.user = saved.user || '';
-    state.device = saved.device || state.device;
   } catch {}
 }
 
@@ -46,7 +42,7 @@ function saveNow() {
   try {
     localStorage.setItem(STORE, JSON.stringify({
       guests: [...state.guests], queue: state.queue, since: state.since,
-      epoch: state.epoch, pin: state.pin, token: state.token, user: state.user, device: state.device,
+      epoch: state.epoch, token: state.token, user: state.user,
     }));
   } catch {}
 }
@@ -114,14 +110,14 @@ async function api(path, body) {
   const res = await fetch(path, {
     method: body ? 'POST' : 'GET',
     headers: {
-      ...(state.token ? { 'x-staff-token': state.token } : { 'x-pin': state.pin }),
+      'x-staff-token': state.token,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (res.status === 401 || res.status === 429) {
     const { error } = await res.json().catch(() => ({}));
-    const hadLogin = Boolean(state.pin || state.token);
+    const hadLogin = Boolean(state.token);
     if (res.status === 401) {
       state.token = ''; // Turned off or deleted by the admin, or a new PIN was set.
       state.user = '';
@@ -215,7 +211,7 @@ function admit(text, fromCamera) {
   }
   record({
     type: 'checkin', number: guest?.number || key,
-    name: parsed.name, batch: parsed.batch, at: Date.now(), device: state.user || state.device,
+    name: parsed.name, batch: parsed.batch, at: Date.now(), device: state.user,
   });
   guest = state.guests.get(key);
   feedback('ok');
@@ -673,12 +669,6 @@ document.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('cl
   renderGuests();
 }));
 
-$('device-name').addEventListener('change', (e) => {
-  state.device = e.target.value.trim() || state.device;
-  e.target.value = state.device;
-  saveNow();
-});
-
 $('csv-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
@@ -749,11 +739,16 @@ function showPinGate(message) {
 }
 
 function renderWho() {
-  $('signed-in').textContent = state.user
-    ? `Signed in as ${state.user}. Your check-ins are recorded under this name.`
-    : 'Using the shared staff PIN. Check-ins are recorded under the device name below.';
-  $('device-field').hidden = Boolean(state.user);
+  $('signed-in').textContent = `Signed in as ${state.user}. Your check-ins are recorded under this name.`;
 }
+
+// Admin pages send people here to sign in, with ?next= saying where to return.
+const ADMIN_PAGES = ['admin.html', 'raffle.html'];
+const nextPage = () => {
+  const next = new URLSearchParams(location.search).get('next');
+  return ADMIN_PAGES.includes(next) ? next : 'admin.html';
+};
+const ADMIN_STORE = 'ticket-scanner-admin';
 
 $('read-photo').addEventListener('click', () => {
   if (current) readHandwriting(current.key, { force: true });
@@ -764,23 +759,25 @@ $('pin-gate').addEventListener('submit', async (e) => {
   unlockAudio();
   const username = $('user-input').value.trim();
   const pin = $('pin-input').value.trim();
-  if (username) {
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, pin }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) return showPinGate(body.error || 'Sign in failed');
-      Object.assign(state, { token: body.token, user: body.name, pin: '' });
-    } catch {
-      return showPinGate("Can't reach the server. Check the Wi-Fi.");
-    }
-  } else {
-    Object.assign(state, { token: '', user: '', pin });
+  let body;
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, pin }),
+    });
+    body = await res.json().catch(() => ({}));
+    if (!res.ok) return showPinGate(body.error || 'Sign in failed');
+  } catch {
+    return showPinGate("Can't reach the server. Check the Wi-Fi.");
   }
   $('pin-input').value = '';
+  if (body.role === 'admin') {
+    try { localStorage.setItem(ADMIN_STORE, body.token); } catch {}
+    location.href = nextPage();
+    return;
+  }
+  Object.assign(state, { token: body.token, user: body.name });
   $('pin-gate').hidden = true;
   saveNow();
   renderWho();
@@ -798,7 +795,7 @@ $('sign-out').addEventListener('click', async () => {
   if (state.token) {
     fetch('/api/logout', { method: 'POST', headers: { 'x-staff-token': state.token } }).catch(() => {});
   }
-  Object.assign(state, { token: '', user: '', pin: '' });
+  Object.assign(state, { token: '', user: '' });
   saveNow();
   hideResult();
   showTab('scan');
@@ -806,8 +803,16 @@ $('sign-out').addEventListener('click', async () => {
 });
 
 async function init() {
+  // A signed-in admin who lands here (or is sent here by an admin page) goes to the admin side.
+  let adminToken = '';
+  try { adminToken = localStorage.getItem(ADMIN_STORE) || ''; } catch {}
+  const wantsAdmin = new URLSearchParams(location.search).has('next');
+  if (adminToken && !wantsAdmin) {
+    location.replace(nextPage());
+    return;
+  }
   loadStore();
-  $('device-name').value = state.device;
+  if (!state.token || wantsAdmin) showPinGate('');
   renderWho();
   renderCounts();
   renderSync();

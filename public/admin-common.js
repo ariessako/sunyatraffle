@@ -1,25 +1,18 @@
-// Login and API calls shared by the admin page and the raffle screen.
+// Sign-in and API calls shared by the admin page and the raffle screen.
+// Signing in happens on the one sign-in page (/), which sends the admin back here.
 const AdminSession = (() => {
   const STORE = 'ticket-scanner-admin';
   let token = '';
   try { token = localStorage.getItem(STORE) || ''; } catch {}
-  const form = () => document.getElementById('login');
-
   let source = null;
 
-  function remember(value) {
-    token = value;
-    if (!value) source?.close();
-    try {
-      if (value) localStorage.setItem(STORE, value);
-      else localStorage.removeItem(STORE);
-    } catch {}
-  }
-
-  function showLogin(message = '') {
-    form().hidden = false;
-    form().querySelector('.error').textContent = message;
-    form().querySelector('[name=password]').focus();
+  // Off to the sign-in page, which returns here once the admin PIN is entered.
+  function signIn() {
+    token = '';
+    source?.close();
+    try { localStorage.removeItem(STORE); } catch {}
+    const page = location.pathname.split('/').pop() || 'admin.html';
+    location.replace(`/?next=${encodeURIComponent(page)}`);
   }
 
   async function call(path, body) {
@@ -29,9 +22,8 @@ const AdminSession = (() => {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 401) {
-      remember('');
-      showLogin('Please log in again.');
-      throw new Error('Please log in again.');
+      signIn();
+      throw new Error('Please sign in again.');
     }
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Server error ${res.status}`);
     return res;
@@ -46,29 +38,9 @@ const AdminSession = (() => {
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }
 
-  // Calls ready() once logged in, and again after any later re-login.
   function start(ready) {
-    form().addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const data = new FormData(form());
-      try {
-        const res = await fetch('/api/admin/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: data.get('username').trim(), password: data.get('password') }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || 'Login failed');
-        remember(body.token);
-        form().querySelector('[name=password]').value = '';
-        form().hidden = true;
-        ready();
-      } catch (err) {
-        showLogin(err.message);
-      }
-    });
     if (token) ready();
-    else showLogin();
+    else signIn();
   }
 
   // Calls onChange whenever the server reports a change. EventSource reconnects by itself
@@ -82,8 +54,8 @@ const AdminSession = (() => {
 
   async function logout() {
     try { await call('/api/admin/logout', {}); } catch {}
-    remember('');
-    location.reload();
+    try { localStorage.removeItem(STORE); } catch {}
+    location.replace('/');
   }
 
   return { call, download, start, logout, subscribe, loggedIn: () => Boolean(token) };

@@ -349,31 +349,6 @@ body.idle .controls { opacity: 0; pointer-events: none; }
 }
 .message:empty { display: none; }
 
-/* ---- Login (only the operator sees this) ---- */
-
-.login {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 24px max(16px, calc(50% - 170px));
-  background: #fff;
-  color: var(--navy);
-  text-align: center;
-  overflow-y: auto;
-}
-.login img { width: auto; max-width: min(70%, 260px); max-height: 26vh; margin: 0 auto 4px; }
-.login > :first-child { margin-top: auto; }
-.login > :last-child { margin-bottom: auto; }
-.login h1 { margin: 0; font: 700 30px var(--serif); }
-.login .event { margin: 0 0 8px; color: #8a6406; font-weight: 600; }
-.login label { display: grid; gap: 4px; color: #4a5884; font-size: 13px; text-align: left; }
-.login input { min-height: 42px; padding: 0 10px; border: 1px solid #c3cbe2; border-radius: 8px; font: inherit; }
-.login .primary { min-height: 44px; background: var(--gold); border: 1px solid #c99417; border-radius: 8px; color: var(--navy); font: 700 15px var(--sans); cursor: pointer; }
-.login .error { margin: 0; color: #b91c1c; font-weight: 600; }
-.login .error:empty { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .lantern, body.celebrating .lantern, .modal-rays { animation: none; }
