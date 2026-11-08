@@ -1,0 +1,17 @@
+{
+  "name": "event-ticket-scanner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fast QR ticket check-in for events",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0"
+  }
+}

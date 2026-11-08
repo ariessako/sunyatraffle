@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Raffle Admin</title>
+  <link rel="icon" href="logo-icon.jpg">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <form id="login" class="login" hidden>
+    <img src="logo.jpg" alt="Sun Yat Sen High School of Iloilo, 101 years">
+    <h1>Admin</h1>
+    <p class="event">101st Alumni Homecoming</p>
+    <label>Username <input name="username" value="admin" autocomplete="username" autocapitalize="none" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <p class="error" role="alert"></p>
+    <button class="primary" type="submit">Log in</button>
+  </form>
+
+  <header class="top">
+    <img class="brand" src="logo-mark.jpg" alt="Sun Yat Sen High School of Iloilo">
+    <div class="title">
+      <strong>Homecoming Admin</strong>
+      <span>101st Alumni Homecoming</span>
+    </div>
+    <nav class="views" aria-label="Sections">
+      <a href="#participants" data-view="participants">Participants</a>
+      <a href="#prizes" data-view="prizes">Prizes</a>
+      <a href="#scanners" data-view="scanners">Scanners</a>
+    </nav>
+    <div class="top-actions">
+      <a class="button gold" href="raffle.html" target="_blank" rel="noopener">Open raffle screen</a>
+      <button id="logout" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="stats" aria-label="Summary">
+      <div><span id="stat-admitted">0</span><small>Admitted</small></div>
+      <div><span id="stat-pool">0</span><small>In the draw</small></div>
+      <div><span id="stat-prizes">0</span><small>Prizes</small></div>
+      <div><span id="stat-winners">0</span><small>Winners drawn</small></div>
+    </section>
+    <p id="error" class="error banner" role="alert"></p>
+
+    <section id="view-participants" class="view">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search ticket, name, batch or email" aria-label="Search participants" autocomplete="off">
+        <div class="segmented" role="group" aria-label="Filter participants">
+          <button type="button" data-filter="admitted" aria-pressed="true">Admitted</button>
+          <button type="button" data-filter="draw" aria-pressed="false">In the draw</button>
+          <button type="button" data-filter="removed" aria-pressed="false">Removed</button>
+          <button type="button" data-filter="winners" aria-pressed="false">Winners</button>
+          <button type="button" data-filter="waiting" aria-pressed="false">Not admitted</button>
+          <button type="button" data-filter="all" aria-pressed="false">All</button>
+        </div>
+        <div class="exports">
+          <button id="export-all" type="button">Export participants</button>
+          <button id="export-winners" type="button">Export winners</button>
+        </div>
+      </div>
+
+      <details class="card add">
+        <summary>Add a participant</summary>
+        <form id="add-participant" class="row-form" novalidate>
+          <label>Ticket number <input name="number" inputmode="numeric" required autocomplete="off"></label>
+          <label>Name <input name="name" autocapitalize="words" autocomplete="off"></label>
+          <label class="short">Batch <input name="batch" inputmode="numeric" autocomplete="off"></label>
+          <label>Email <input name="email" type="email" autocapitalize="none" autocomplete="off"></label>
+          <button class="primary" type="submit">Add and admit</button>
+        </form>
+        <p class="note">Records them as admitted and puts them in the draw. Use this for anyone who got in without being scanned.</p>
+        <p id="add-result" class="note" role="status"></p>
+      </details>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Ticket</th><th>Name</th><th>Batch</th><th>Email</th><th>Checked in</th><th>Raffle</th><th><span class="visually-hidden">Actions</span></th></tr>
+          </thead>
+          <tbody id="participants"></tbody>
+        </table>
+      </div>
+      <p id="participants-note" class="note"></p>
+    </section>
+
+    <section id="view-prizes" class="view" hidden>
+      <form id="add-prize" class="card row-form" novalidate>
+        <label class="grow">Prize <input name="name" maxlength="120" placeholder="e.g. 55-inch Smart TV" autocomplete="off" required></label>
+        <label class="short">Winners <input name="quantity" type="number" min="1" max="500" value="1" required></label>
+        <button class="primary" type="submit">Add prize</button>
+      </form>
+      <p class="note">Prizes are drawn in this order on the raffle screen. Move the grand prize to the end to save it for last.</p>
+      <p id="prize-result" class="error" role="alert"></p>
+      <ol id="prizes" class="prizes"></ol>
+    </section>
+    <section id="view-scanners" class="view" hidden>
+      <div class="card shared">
+        <div>
+          <strong>Shared staff PIN: <span id="shared-pin" class="mono"></span></strong>
+          <p class="note">Anyone with this PIN can scan, and their records show the device name instead of a person. Turn it off once every scanner has their own login.</p>
+        </div>
+        <button id="shared-toggle" type="button"></button>
+      </div>
+
+      <form id="add-scanner" class="card row-form" novalidate>
+        <label>Name on records <input name="name" maxlength="60" placeholder="e.g. Maria (Gate 1)" autocomplete="off" required></label>
+        <label>Username <input name="username" maxlength="30" placeholder="e.g. maria" autocapitalize="none" autocomplete="off" required></label>
+        <label class="short">PIN <input name="pin" inputmode="numeric" maxlength="8" placeholder="Auto" autocomplete="off"></label>
+        <button class="primary" type="submit">Add scanner</button>
+      </form>
+      <p class="note">Leave the PIN blank to make a random 6-digit one. PINs are shown only once, so write them down or share them straight away.</p>
+      <div id="pin-notice" class="card pin-notice" role="status" hidden>
+        <p id="pin-notice-text"></p>
+        <button id="pin-notice-close" type="button" class="small">Done</button>
+      </div>
+      <p id="scanner-result" class="error" role="alert"></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name on records</th><th>Username</th><th>Status</th><th>Signed in on</th><th>Scans</th><th><span class="visually-hidden">Actions</span></th></tr>
+          </thead>
+          <tbody id="scanners"></tbody>
+        </table>
+      </div>
+      <p id="scanners-note" class="note"></p>
+    </section>
+  </main>
+
+  <script src="admin-common.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

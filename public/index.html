@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Ticket Scanner</title>
+  <link rel="icon" href="logo-icon.jpg">
+  <link rel="apple-touch-icon" href="logo-icon.jpg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <form id="pin-gate" class="gate" hidden>
+    <img class="gate-logo" src="logo.jpg" alt="Sun Yat Sen High School of Iloilo, 101 years">
+    <h1>Ticket Scanner</h1>
+    <p class="gate-event">101st Alumni Homecoming</p>
+    <label for="user-input">Username</label>
+    <input id="user-input" type="text" autocapitalize="none" autocorrect="off" autocomplete="username" spellcheck="false">
+    <label for="pin-input">PIN</label>
+    <input id="pin-input" type="password" inputmode="numeric" autocomplete="current-password" required>
+    <p class="gate-hint">No username? Leave it blank and use the shared staff PIN.</p>
+    <p id="pin-error" class="error" role="alert"></p>
+    <button class="primary" type="submit">Start scanning</button>
+  </form>
+
+  <form id="edit-form" class="gate" novalidate hidden>
+    <h1>Edit guest</h1>
+    <p id="edit-number" class="note"></p>
+    <label for="edit-name">Name</label>
+    <input id="edit-name" type="text" maxlength="200" autocomplete="off">
+    <label for="edit-batch">Batch</label>
+    <input id="edit-batch" type="text" inputmode="numeric" maxlength="100" autocomplete="off">
+    <label for="edit-email">Email</label>
+    <input id="edit-email" type="email" inputmode="email" maxlength="254" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+    <p id="edit-error" class="error" role="alert"></p>
+    <button class="primary" type="submit">Save changes</button>
+    <button id="edit-cancel" type="button">Cancel</button>
+  </form>
+
+  <header class="topbar">
+    <img class="brand" src="logo-mark.jpg" alt="Sun Yat Sen High School of Iloilo">
+    <div class="count"><strong id="count-in">0</strong><span id="count-total"></span></div>
+    <button id="sync-status" class="sync" type="button" data-state="syncing">Connecting</button>
+  </header>
+
+  <main>
+    <section id="tab-scan" class="tab">
+      <div class="camera">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="reticle" aria-hidden="true">
+          <span class="guide-tip above">Line up the QR on the left box</span>
+          <span class="guide-qr">QR</span>
+          <span class="guide-field name">NAME</span>
+          <span class="guide-field batch">BATCH</span>
+          <span class="guide-tip below">Keep name and batch inside the frame. Hold still.</span>
+        </div>
+        <button id="camera-message" class="camera-message" type="button" hidden></button>
+        <button id="torch" class="torch" type="button" hidden>Light</button>
+      </div>
+
+      <div id="result" class="result" data-kind="ok" hidden aria-live="assertive">
+        <div class="verdict">
+          <span id="result-title"></span>
+          <button id="undo" class="link" type="button">Wrong ticket</button>
+        </div>
+        <div id="result-name" class="guest-name"></div>
+        <div id="result-meta" class="guest-meta"></div>
+        <p id="result-note" class="error" role="alert"></p>
+        <p id="card-status" class="note" role="status"></p>
+        <button id="read-photo" class="read-photo" type="button" hidden>Read name &amp; batch from ticket</button>
+        <form id="details-form" class="details" novalidate>
+          <input id="card-name" type="text" maxlength="200" enterkeyhint="next" placeholder="Name" aria-label="Name"
+            autocapitalize="words" autocorrect="off" autocomplete="off" spellcheck="false">
+          <div class="email-row">
+            <input id="card-batch" class="batch" type="text" inputmode="numeric" maxlength="100" enterkeyhint="next"
+              placeholder="Batch (opt.)" aria-label="Batch, optional" autocomplete="off">
+            <input id="card-email" type="email" inputmode="email" maxlength="254" enterkeyhint="done" placeholder="Email"
+              aria-label="Email" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="email-row">
+            <div class="chips">
+              <button type="button" data-domain="@gmail.com">@gmail.com</button>
+              <button type="button" data-domain="@yahoo.com">@yahoo.com</button>
+              <button type="button" data-domain="@outlook.com">@outlook.com</button>
+              <button type="button" data-domain="@icloud.com">@icloud.com</button>
+            </div>
+            <button class="primary done" type="submit">Done</button>
+          </div>
+          <p id="details-error" class="error" role="alert"></p>
+        </form>
+      </div>
+
+      <form id="manual" class="manual">
+        <input id="manual-input" type="text" inputmode="numeric" enterkeyhint="go" placeholder="Type ticket number" aria-label="Ticket number"
+          autocorrect="off" autocomplete="off" spellcheck="false">
+        <button type="submit">Enter</button>
+      </form>
+    </section>
+
+    <section id="tab-guests" class="tab page" hidden>
+      <div id="batch-stats" class="batch-stats"></div>
+      <input id="search" type="search" placeholder="Search name, number, batch, email" aria-label="Search guests" autocomplete="off">
+      <div class="filters" role="group" aria-label="Filter guests">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="in" aria-pressed="false">Checked in</button>
+        <button type="button" data-filter="out" aria-pressed="false">Not yet</button>
+        <button type="button" data-filter="noemail" aria-pressed="false">In, no email</button>
+      </div>
+      <ul id="guest-list" class="guest-list"></ul>
+      <p id="guest-note" class="note"></p>
+    </section>
+
+    <section id="tab-setup" class="tab page" hidden>
+      <h2>This scanner</h2>
+      <p id="signed-in" class="note"></p>
+      <div id="device-field">
+        <label for="device-name">Device name shown on records</label>
+        <input id="device-name" type="text" maxlength="60" autocomplete="off">
+      </div>
+      <button id="sign-out" type="button">Sign out</button>
+      <p id="sign-out-result" class="note" role="status"></p>
+
+      <h2>Guest list</h2>
+      <p class="note">CSV with columns for number, name and batch (email is optional). Save Excel or Sheets files as CSV first. Importing again keeps check-ins but replaces names and batches, including any you edited here. With a list loaded, tickets not on it are refused.</p>
+      <label class="button" for="csv-file">Import CSV</label>
+      <input id="csv-file" class="visually-hidden" type="file" accept=".csv,.txt,text/csv">
+      <p id="import-result" class="note" role="status"></p>
+      <p class="note"><a href="sample-guests.csv" download>Sample CSV</a> · <a href="test-tickets.html" target="_blank">Test tickets</a></p>
+
+      <h2>Records</h2>
+      <button id="export" class="primary" type="button">Export check-ins (CSV)</button>
+      <p id="export-result" class="note" role="status"></p>
+
+      <h2>Clear all data</h2>
+      <p class="note">Deletes the guest list and every check-in on all scanners. This can't be undone, so export first if you need the records.</p>
+      <button id="clear" class="danger" type="button">Clear all data</button>
+      <p id="clear-result" class="note" role="status"></p>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button type="button" data-tab="scan" aria-current="page">Scan</button>
+    <button type="button" data-tab="guests">Guests</button>
+    <button type="button" data-tab="setup">Setup</button>
+  </nav>
+
+  <script src="parse.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

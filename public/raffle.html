@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1c4d">
+  <title>Grand Raffle</title>
+  <link rel="icon" href="logo-icon.jpg">
+  <link rel="stylesheet" href="raffle.css">
+</head>
+<body>
+  <!-- Ornaments drawn once and reused: lantern, key-fret corner, auspicious cloud. -->
+  <svg class="sprites" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="lantern-red" cx="42%" cy="40%" r="65%">
+        <stop offset="0" stop-color="#ff6a52"/>
+        <stop offset=".45" stop-color="#d0201f"/>
+        <stop offset="1" stop-color="#7a0a0d"/>
+      </radialGradient>
+      <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fbe7a1"/>
+        <stop offset=".5" stop-color="#d9a521"/>
+        <stop offset="1" stop-color="#9f700c"/>
+      </linearGradient>
+      <symbol id="lantern" viewBox="0 0 80 160">
+        <line x1="40" y1="0" x2="40" y2="16" stroke="#d9a521" stroke-width="1.5"/>
+        <rect x="25" y="14" width="30" height="9" rx="2" fill="url(#gold)"/>
+        <ellipse cx="40" cy="64" rx="35" ry="42" fill="url(#lantern-red)"/>
+        <!-- Candlelight inside, flickering softly. -->
+        <ellipse cx="40" cy="66" rx="20" ry="26" fill="#ffd27a" opacity=".3">
+          <animate attributeName="opacity" values=".22;.42;.3;.5;.26;.38;.22" dur="3.4s" repeatCount="indefinite"/>
+          <animate attributeName="rx" values="20;22;19;21;20" dur="2.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <ellipse cx="40" cy="64" rx="23" ry="42" fill="none" stroke="#7a0a0d" stroke-opacity=".5" stroke-width="1.2"/>
+        <ellipse cx="40" cy="64" rx="11" ry="42" fill="none" stroke="#7a0a0d" stroke-opacity=".5" stroke-width="1.2"/>
+        <path d="M5 64h70" stroke="#f7dc8a" stroke-opacity=".6" stroke-width="1.5"/>
+        <rect x="25" y="104" width="30" height="9" rx="2" fill="url(#gold)"/>
+        <circle cx="40" cy="119" r="3.5" fill="#d9a521"/>
+        <g stroke="#e8b42f" stroke-width="1.2">
+          <animateTransform attributeName="transform" type="rotate" values="-7 40 119;7 40 119;-7 40 119" dur="2.2s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+          <line x1="35" y1="121" x2="33" y2="156"/><line x1="38" y1="121" x2="37.5" y2="158"/>
+          <line x1="40" y1="121" x2="40" y2="159"/><line x1="42" y1="121" x2="42.5" y2="158"/>
+          <line x1="45" y1="121" x2="47" y2="156"/>
+        </g>
+      </symbol>
+      <symbol id="fret-corner" viewBox="0 0 44 44">
+        <path d="M2 42V2h40M8 42V8h28v14H22v-8h8" fill="none" stroke="#e8b42f" stroke-width="2.2" stroke-linecap="square"/>
+      </symbol>
+      <symbol id="cloud" viewBox="0 0 160 70">
+        <g fill="none" stroke="#e8b42f" stroke-width="2" stroke-linecap="round">
+          <path d="M8 60h144"/>
+          <path d="M22 60c-10-1-14-14-4-20 2-12 16-16 25-9 4-15 24-19 34-7 9-10 27-7 30 6 12-4 24 6 20 18 8 2 10 9 6 12"/>
+          <path d="M43 31c0-7 9-9 12-3 2 4-2 8-6 6"/>
+          <path d="M77 24c0-7 10-9 13-2 2 5-3 9-7 6"/>
+          <path d="M111 30c1-6 10-7 12-1 1 4-3 7-6 5"/>
+        </g>
+      </symbol>
+    </defs>
+  </svg>
+
+  <form id="login" class="login" hidden>
+    <img src="logo.jpg" alt="Sun Yat Sen High School of Iloilo, 101 years">
+    <h1>Raffle screen</h1>
+    <p class="event">Log in with the admin account</p>
+    <label>Username <input name="username" value="admin" autocomplete="username" autocapitalize="none" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <p class="error" role="alert"></p>
+    <button class="primary" type="submit">Open raffle</button>
+  </form>
+
+  <div class="decor" aria-hidden="true">
+    <svg class="lantern left"><use href="#lantern"/></svg>
+    <svg class="lantern right"><use href="#lantern"/></svg>
+    <svg class="lantern small left"><use href="#lantern"/></svg>
+    <svg class="lantern small right"><use href="#lantern"/></svg>
+    <svg class="cloud left"><use href="#cloud"/></svg>
+    <svg class="cloud right"><use href="#cloud"/></svg>
+    <svg class="corner tl"><use href="#fret-corner"/></svg>
+    <svg class="corner tr"><use href="#fret-corner"/></svg>
+    <svg class="corner bl"><use href="#fret-corner"/></svg>
+    <svg class="corner br"><use href="#fret-corner"/></svg>
+  </div>
+
+  <div class="stage">
+    <header class="masthead">
+      <div class="crest"><img src="logo.jpg" alt="Sun Yat Sen High School of Iloilo, 101 years"></div>
+      <p class="eyebrow">101st Alumni Homecoming <span aria-hidden="true">◆</span> Grand Raffle</p>
+    </header>
+
+    <section class="prize" aria-live="polite">
+      <p id="prize-step" class="prize-step"></p>
+      <h1 id="prize-name" class="prize-name">Grand Raffle</h1>
+      <p id="prize-meta" class="prize-meta"></p>
+    </section>
+
+    <section class="machine">
+      <div class="machine-frame">
+        <span class="payline left" aria-hidden="true"></span>
+        <div id="reels" class="reels" aria-hidden="true"></div>
+        <span class="payline right" aria-hidden="true"></span>
+      </div>
+      <div class="winner" aria-live="assertive">
+        <p id="winner-label" class="winner-label"></p>
+        <p id="winner-name" class="winner-name"></p>
+        <p id="winner-batch" class="winner-batch"></p>
+      </div>
+    </section>
+
+    <section id="winners-row" class="winners-row" hidden>
+      <span class="winners-title">Winners</span>
+      <ol id="winners-list" class="winners-list"></ol>
+    </section>
+
+    <footer class="ticker" aria-hidden="true"><div id="ticker-track" class="ticker-track"></div></footer>
+  </div>
+
+  <div id="winner-modal" class="winner-modal" role="dialog" aria-modal="true" aria-labelledby="modal-name" hidden>
+    <div class="modal-rays" aria-hidden="true"></div>
+    <div class="modal-card">
+      <svg class="corner tl" aria-hidden="true"><use href="#fret-corner"/></svg>
+      <svg class="corner tr" aria-hidden="true"><use href="#fret-corner"/></svg>
+      <svg class="corner bl" aria-hidden="true"><use href="#fret-corner"/></svg>
+      <svg class="corner br" aria-hidden="true"><use href="#fret-corner"/></svg>
+      <p class="modal-kicker">Congratulations</p>
+      <p id="modal-prize" class="modal-prize"></p>
+      <p class="modal-divider" aria-hidden="true"><span></span>◆<span></span></p>
+      <h2 id="modal-name" class="modal-name"></h2>
+      <p id="modal-batch" class="modal-batch"></p>
+      <p class="modal-ticket">Ticket <b id="modal-ticket"></b></p>
+    </div>
+  </div>
+
+  <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
+
+  <div id="controls" class="controls" role="toolbar" aria-label="Raffle controls">
+    <button id="prev" type="button" title="Previous prize (Left arrow)" aria-label="Previous prize">‹</button>
+    <select id="prize-select" aria-label="Prize to draw"></select>
+    <button id="next" type="button" title="Next prize (Right arrow)" aria-label="Next prize">›</button>
+    <button id="draw" class="draw" type="button" title="Draw (Space)">Draw</button>
+    <button id="cancel-win" type="button" title="Cancel the last win for this prize and put them back in the draw">Cancel win</button>
+    <button id="absent" type="button" title="Cancel the last win, take them out of the draw, and draw again">Not present, redraw</button>
+    <button id="mute" type="button" title="Sound (M)">Sound on</button>
+    <button id="fullscreen" type="button" title="Full screen (F)">Full screen</button>
+    <a class="admin-link" href="admin.html#prizes" target="_blank" rel="noopener">Admin</a>
+  </div>
+  <p id="message" class="message" role="status"></p>
+
+  <script src="admin-common.js"></script>
+  <script src="raffle.js"></script>
+</body>
+</html>
